@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-
-const GROQ_NOTE = "// Replace with your Groq API key in the AI call below";
+import React from 'react';
+// const GROQ_NOTE = "// Replace with your Groq API key in the AI call below";
 
 const COLORS = {
   primary: "#6366f1",
