@@ -45,6 +45,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [activeSection, setActiveSection] = useState("dashboard");
   const [resume, setResume] = useState(sampleResume);
+  const [savedResumes, setSavedResumes] = useState([]);
   const [aiOutput, setAiOutput] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [atsScore, setAtsScore] = useState(null);
@@ -56,9 +57,46 @@ export default function App() {
   const [jobTitle, setJobTitle] = useState("");
   const [activeTab, setActiveTab] = useState("personal");
 
+  // Load saved resumes from localStorage on startup
+  useEffect(() => {
+    const stored = localStorage.getItem("resumeai_resumes");
+    if (stored) {
+      const list = JSON.parse(stored);
+      setSavedResumes(list);
+      if (list.length > 0) setResume(list[0]);
+    }
+  }, []);
+
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
+  };
+
+  const saveResume = () => {
+    const existing = savedResumes.findIndex(r => r.name === resume.name && r.email === resume.email);
+    let updated;
+    if (existing >= 0) {
+      updated = [...savedResumes];
+      updated[existing] = { ...resume, savedAt: new Date().toLocaleString() };
+    } else {
+      updated = [{ ...resume, savedAt: new Date().toLocaleString() }, ...savedResumes];
+    }
+    setSavedResumes(updated);
+    localStorage.setItem("resumeai_resumes", JSON.stringify(updated));
+    showToast("Resume saved!");
+  };
+
+  const loadResume = (r) => {
+    setResume(r);
+    setActiveSection("builder");
+    showToast(`Loaded: ${r.name}`);
+  };
+
+  const deleteResume = (idx) => {
+    const updated = savedResumes.filter((_, i) => i !== idx);
+    setSavedResumes(updated);
+    localStorage.setItem("resumeai_resumes", JSON.stringify(updated));
+    showToast("Resume deleted", "error");
   };
 
   const callClaude = async (prompt) => {
@@ -162,8 +200,8 @@ Skills: ${resume.skills.join(", ")}`;
       {toast && <Toast msg={toast.msg} type={toast.type} />}
       <Sidebar open={sidebarOpen} active={activeSection} onNav={setActiveSection} onToggle={() => setSidebarOpen(!sidebarOpen)} user={user} onLogout={() => setPage("login")} />
       <main style={{ flex: 1, marginLeft: sidebarOpen ? 260 : 72, transition: "margin .3s", padding: "2rem", overflowY: "auto" }}>
-        {activeSection === "dashboard" && <Dashboard resume={resume} onNav={setActiveSection} onImprove={handleImproveResume} onAts={handleAtsCheck} atsScore={atsScore} aiLoading={aiLoading} />}
-        {activeSection === "builder" && <ResumeBuilder resume={resume} setResume={setResume} activeTab={activeTab} setActiveTab={setActiveTab} showToast={showToast} />}
+        {activeSection === "dashboard" && <Dashboard resume={resume} onNav={setActiveSection} onImprove={handleImproveResume} onAts={handleAtsCheck} atsScore={atsScore} aiLoading={aiLoading} savedResumes={savedResumes} onLoad={loadResume} onDelete={deleteResume} />}
+        {activeSection === "builder" && <ResumeBuilder resume={resume} setResume={setResume} activeTab={activeTab} setActiveTab={setActiveTab} showToast={showToast} onSave={saveResume} />}
         {activeSection === "preview" && <ResumePreview resume={resume} template={template} setTemplate={setTemplate} />}
         {activeSection === "ai" && <AiImprover aiOutput={aiOutput} aiLoading={aiLoading} resume={resume} onImprove={handleImproveResume} onApply={() => { setResume({ ...resume, summary: aiOutput }); showToast("Applied to resume!"); }} />}
         {activeSection === "ats" && <AtsChecker atsScore={atsScore} aiLoading={aiLoading} onCheck={handleAtsCheck} />}
@@ -269,7 +307,7 @@ function Sidebar({ open, active, onNav, onToggle, user, onLogout }) {
   );
 }
 
-function Dashboard({ resume, onNav, onImprove, onAts, atsScore, aiLoading }) {
+function Dashboard({ resume, onNav, onImprove, onAts, atsScore, aiLoading, savedResumes, onLoad, onDelete }) {
   const stats = [
     { label: "Resumes Created", value: "3", icon: "◻", color: COLORS.primary },
     { label: "ATS Score", value: atsScore ? `${atsScore.score}%` : "--", icon: "◎", color: COLORS.success },
@@ -315,11 +353,36 @@ function Dashboard({ resume, onNav, onImprove, onAts, atsScore, aiLoading }) {
         </div>
         <button onClick={() => onNav("builder")} style={{ ...btnPrimary, padding: "8px 16px", fontSize: 13 }}>Edit</button>
       </div>
+
+      <h2 style={{ fontSize: 17, fontWeight: 600, margin: "2rem 0 1rem" }}>Saved Resumes</h2>
+      {savedResumes.length === 0 ? (
+        <div style={{ background: COLORS.surface, borderRadius: 14, padding: "2rem", textAlign: "center", border: `1px solid ${COLORS.border}`, color: COLORS.muted, fontSize: 14 }}>
+          <div style={{ fontSize: 36, marginBottom: 8 }}>📄</div>
+          Koi saved resume nahi — Resume Builder mein jao aur Save karo!
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {savedResumes.map((r, i) => (
+            <div key={i} style={{ background: COLORS.surface, borderRadius: 14, padding: "1.25rem 1.5rem", border: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 16 }}>
+              <div style={{ width: 42, height: 48, background: COLORS.primary + "33", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>◻</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 15, color: COLORS.text }}>{r.name}</div>
+                <div style={{ fontSize: 13, color: COLORS.muted, marginTop: 2 }}>{r.title} · {r.email}</div>
+                {r.savedAt && <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 2 }}>Saved: {r.savedAt}</div>}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                <button onClick={() => onLoad(r)} style={{ ...btnPrimary, padding: "7px 14px", fontSize: 12 }}>Load</button>
+                <button onClick={() => onDelete(i)} style={{ background: "transparent", border: `1px solid ${COLORS.danger}44`, borderRadius: 8, color: COLORS.danger, padding: "7px 12px", cursor: "pointer", fontSize: 12 }}>Delete</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function ResumeBuilder({ resume, setResume, activeTab, setActiveTab, showToast }) {
+function ResumeBuilder({ resume, setResume, activeTab, setActiveTab, showToast, onSave }) {
   const tabs = ["personal", "experience", "education", "skills", "projects"];
   const update = (field, val) => setResume({ ...resume, [field]: val });
 
@@ -410,7 +473,7 @@ function ResumeBuilder({ resume, setResume, activeTab, setActiveTab, showToast }
           </div>
         )}
         <div style={{ marginTop: "1.5rem", display: "flex", gap: 12 }}>
-          <button onClick={() => showToast("Resume saved!")} style={{ ...btnPrimary, padding: "10px 24px" }}>Save Resume</button>
+          <button onClick={onSave} style={{ ...btnPrimary, padding: "10px 24px" }}>Save Resume</button>
         </div>
       </div>
     </div>
