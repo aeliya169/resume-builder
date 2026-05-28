@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-
+/* eslint-disable */
+import { useState, useEffect } from "react";
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 const GROQ_API_KEY = "YOUR_GROQ_API_KEY"; // Replace with your key
 
